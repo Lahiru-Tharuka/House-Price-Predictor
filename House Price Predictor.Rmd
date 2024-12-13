@@ -1,0 +1,274 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+1. Exploratory Data Analysis (EDA)
+
+
+```{r}
+# Load necessary libraries
+library(ggcorrplot)
+
+library(tidyverse)
+```
+```{r}
+# Read the dataset
+data <- read_csv("CityHousing.csv")
+```
+#display dataset
+```{r}
+data
+```
+```{r}
+# Display structure and summary
+str(data)
+summary(data)
+```
+```{r}
+# Scatter Plot: HousePrice vs SquareFootage
+plot(data$SquareFootage,data$HousePrice, 
+     main = "Scatter Plot: HousePrice vs SquareFootage", 
+     xlab = "Square Footage (sq. ft.)", 
+     ylab = "House Price (USD)", 
+     col = "blue", 
+     pch = 19)
+
+```
+```{r}
+#Histogram: Distribution of HousePrice
+hist(data$HousePrice, 
+     main = "Histogram of House Prices", 
+     xlab = "House Price (USD)", 
+     col = "lightblue", 
+     border = "black", 
+     breaks = 20)
+
+```
+```{r}
+# Boxplot: HousePrice by Bedrooms
+```
+
+
+```{r}
+boxplot(data$HousePrice ~ data$Bedrooms, 
+        main = "Boxplot of House Prices by Bedrooms", 
+        xlab = "Number of Bedrooms", 
+        ylab = "House Price (USD)", 
+        col = "lightgreen")
+
+```
+
+```{r}
+# Line Plot: DistanceToCityCenter vs HousePrice
+plot(data$DistanceToCityCenter, data$HousePrice, 
+     type = "l", 
+     main = "Line Plot: Distance to City Center vs House Price", 
+     xlab = "Distance to City Center (miles)", 
+     ylab = "House Price (USD)", 
+     col = "green", 
+     lwd = 2)
+
+```
+
+```{r}
+#identify the missing values
+colSums(is.na(data))  # Count missing values in each column
+
+```
+no any missing values in this data set
+
+
+
+
+```{r}
+# Check the type of square_footage column
+str(data$SquareFootage)
+
+# If needed, convert to numeric
+data$SquareFootage <- as.numeric(data$SquareFootage)
+
+```
+
+```{r}
+# Replace outliers using IQR
+Q1 <- quantile(data$squarefootage, 0.25, na.rm = TRUE)
+Q3 <- quantile(data$squarefootage, 0.75, na.rm = TRUE)
+IQR <- Q3 - Q1
+
+# Define bounds
+lower_bound <- Q1 - 1.5 * IQR
+upper_bound <- Q3 + 1.5 * IQR
+
+
+
+
+
+```
+```{r}
+#Compute correlations
+correlation_matrix <- cor(data %>% select(where(is.numeric)), use = "complete.obs")
+print(correlation_matrix)
+
+```
+
+```{r}
+#Visualize as a heatmap
+
+ggcorrplot(correlation_matrix, lab = TRUE, title = "Correlation Heatmap")
+
+```
+          *larger homes tend to cost more
+          *more bedrooms might increase price but not always proportionally
+          *closer to the city, higher the price
+          
+          
+          
+2. Build the Regression Model
+
+```{r}
+#Build the regression model
+full_model <- lm(HousePrice ~ SquareFootage + Bedrooms + DistanceToCityCenter + NeighborhoodIncome, data = data)
+
+# Summary of the model
+summary(full_model)
+
+```
+```{r}
+#Check for Multicollinearity
+library(car)  # For VIF calculation
+vif(full_model)
+
+```
+
+```{r}
+#Refine the Model
+refined_model <- lm(HousePrice ~ SquareFootage + Bedrooms + DistanceToCityCenter + NeighborhoodIncome, data = data)
+summary(refined_model)
+
+```
+```{r}
+#Predict House Prices
+predictions <- predict(refined_model, newdata = data)
+head(predictions)
+
+```
+```{r}
+#Evaluate Model Performance
+actual <- data$house_price
+mse <- mean((actual - predictions)^2)
+r_squared <- summary(refined_model)$r.squared
+
+print(paste("MSE:", mse))
+print(paste("R-squared:", r_squared))
+
+```
+
+ 3. Interpret the Results
+ 
+```{r}
+summary(refined_model)
+
+```
+
+
+(Intercept)
+Value: 49,110
+When all predictors (SquareFootage, Bedrooms, DistanceToCityCenter, NeighborhoodIncome) are zero, the baseline house price is $49,110.
+Note: This is mostly a theoretical reference and not directly meaningful since a house with zero square footage, bedrooms, and income isn’t practical.
+
+SquareFootage (199.5)
+Value: 199.5
+For every additional square foot of house area, the house price increases by approximately $199.50, keeping all other factors constant.
+This strong, positive relationship is logical: larger homes typically cost more.
+          
+Bedrooms (10,940)
+Value: 10,940
+Each additional bedroom increases the house price by $10,940, assuming other factors remain constant.
+This indicates a significant positive impact of more bedrooms, which adds value to the property.
+          
+          
+DistanceToCityCenter (-1,201)
+Value: -1,201
+For every additional mile away from the city center, the house price decreases by $1,201, holding all other variables constant.
+This negative relationship is expected, as proximity to the city center generally increases property value due to accessibility and convenience.             
+
+
+NeighborhoodIncome (0.2838)
+Value: 0.2838
+For every $1 increase in average neighborhood income, the house price increases by approximately 28 cents, holding all other factors constant.
+Though the effect is relatively small, it reflects the influence of a wealthier neighborhood on property values.
+
+
+```{r}
+# Install and load the car package
+library(car)
+```
+
+```{r}
+# Calculate the VIF for each predictor in the model
+vif(refined_model)
+
+```
+
+
+
+4. Validate Model Assumptions 
+
+01.Linearity
+```{r}
+# Residuals vs Fitted Values
+plot(refined_model$fitted.values, residuals(refined_model),
+     main = "Residuals vs Fitted Values",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     pch = 20, col = "blue")
+abline(h = 0, lty = 2, col = "red") 
+
+```
+*The residuals should scatter randomly around the horizontal line. Any clear patterns (e.g., curves) indicate a violation of linearity
+
+
+02. Normality of Residuals
+
+```{r}
+# Q-Q Plot
+qqnorm(residuals(refined_model), main = "Normal Q-Q Plot")
+qqline(residuals(refined_model), col = "red")  
+
+```
+*Residuals should fall along the diagonal line. Deviations, especially in the tails, suggest a violation of normality.
+
+
+03. Homoscedasticity
+
+```{r}
+#Scale-Location Plot
+plot(refined_model, which = 3) 
+
+```
+*The residuals should be evenly spread around the horizontal line. A funnel shape (narrowing or widening) indicates heteroscedasticity.
+
+04. Independence of Errors
+```{r}
+# Durbin-Watson Test
+library(lmtest)
+dwtest(refined_model)
+
+```
+
+5. Generate Insights and Recommendations
+
+*Insights*
+
+The regression model highlights that square footage and number of bedrooms are the strongest positive predictors of house prices. Larger homes and more bedrooms significantly increase value, with an additional square foot adding about $199.50 and each bedroom contributing $10,940. Conversely, distance from the city center negatively impacts prices, with houses losing $1,201 per mile. While neighborhood income positively influences prices, its effect is relatively minor. The model has a high R-squared, indicating it explains a substantial portion of the variability in house prices, and all predictors are statistically significant.
+
+
+*Recommendations*
+
+Based on the findings, buyers should prioritize properties with larger square footage and more bedrooms, especially those closer to city centers. Sellers can maximize property value by emphasizing these features in listings. Real estate developers should focus on building family-sized homes in urban or high-income areas to meet market demand. Policymakers should invest in better transportation links to suburban areas to boost the value of properties farther from the city.
+
+
+
+
